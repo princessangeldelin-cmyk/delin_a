@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getProducts } from "../api/products";
+import { getProductQueries, getProducts } from "../api/products";
 import ProductTable from "../components/dashboard/ProductTable";
+import QueryVisualizations from "../components/dashboard/QueryVisualizations";
 import SummaryCard from "../components/dashboard/SummaryCard";
 import "./ProductDashboard.css";
 
@@ -29,6 +30,9 @@ function ProductDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [queryResults, setQueryResults] = useState(null);
+  const [queryLoading, setQueryLoading] = useState(true);
+  const [queryError, setQueryError] = useState("");
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -57,9 +61,30 @@ function ProductDashboard() {
     }
   }, []);
 
+  const loadQueryResults = useCallback(async () => {
+    setQueryLoading(true);
+    setQueryError("");
+
+    try {
+      const response = await getProductQueries();
+      const results = response.data?.data;
+
+      if (!results || typeof results !== "object" || Array.isArray(results)) {
+        throw new Error("The product queries API returned an unexpected response.");
+      }
+
+      setQueryResults(results);
+    } catch (requestError) {
+      setQueryError(getErrorMessage(requestError));
+    } finally {
+      setQueryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadProducts();
-  }, [loadProducts]);
+    loadQueryResults();
+  }, [loadProducts, loadQueryResults]);
 
   const filteredProducts = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -83,6 +108,7 @@ function ProductDashboard() {
     pageStart + PAGE_SIZE,
     filteredProducts.length
   );
+  const refreshing = loading || queryLoading;
 
   const categoryCount = new Set(
     products.map((product) => product.category).filter(Boolean)
@@ -110,11 +136,14 @@ function ProductDashboard() {
         </div>
         <button
           className="refresh-button"
-          onClick={loadProducts}
+          onClick={() => {
+            loadProducts();
+            loadQueryResults();
+          }}
           type="button"
-          disabled={loading}
+          disabled={refreshing}
         >
-          {loading ? "Refreshing..." : "Refresh"}
+          {refreshing ? "Refreshing..." : "Refresh"}
         </button>
       </header>
 
@@ -122,6 +151,15 @@ function ProductDashboard() {
         <div className="dashboard-error" role="alert">
           <span>{error}</span>
           <button onClick={loadProducts} type="button" disabled={loading}>
+            Try again
+          </button>
+        </div>
+      )}
+
+      {queryError && (
+        <div className="dashboard-error" role="alert">
+          <span>Could not load query visualizations. {queryError}</span>
+          <button onClick={loadQueryResults} type="button" disabled={queryLoading}>
             Try again
           </button>
         </div>
@@ -149,6 +187,11 @@ function ProductDashboard() {
           detail="Price multiplied by quantity"
         />
       </section>
+
+      <QueryVisualizations
+        results={queryResults}
+        loading={queryLoading}
+      />
 
       <section className="products-panel" aria-labelledby="products-heading">
         <div className="products-panel-header">

@@ -1,9 +1,5 @@
 import api from './axios';
 
-export const getPost = async () => {
-    return await api.get('/posts')
-};
+export const getPost = () => api.get('/posts');
 
-export const storePost = async (data) => {
-    return await api.post('/posts', data);
-}
+export const storePost = (data) => api.post('/posts', data);
